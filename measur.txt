@@ -1,0 +1,20 @@
+Measuring of Adding (example = Array(9, 7, 5, 3, 1) + Array(3, 2, 1, 8, 6) ):
+
+For 1 thread: 0.0724408 ms 
+
+For 2 threads: 
+Parallel: 1.9756615999999998 ms
+
+
+For 4 threads: 
+Parallel: 2.2328398 ms
+
+
+For 8 threads: 
+Parallel: 3.1669599999999996 ms
+
+
+For 16 threads: 
+Parallel: 10.439961 ms
+
+
