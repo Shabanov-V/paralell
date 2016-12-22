@@ -1,0 +1,112 @@
+
+
+B1 can't find client
+
+C1 seat in 9 place
+
+C1 -> B1
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+B2 can't find client
+
+C2 seat in 9 place
+
+C3 seat in 8 place
+
+C2 -> B2
+
+C4 seat in 9 place
+
+B2 is free
+
+C3 -> B2
+
+B1 is free
+
+C4 -> B1
+
+C5 seat in 9 place
+
+C6 seat in 8 place
+
+C7 seat in 7 place
+
+C8 seat in 6 place
+
+B2 is free
+
+C5 -> B2
+
+B1 is free
+
+C6 -> B1
+
+C9 seat in 9 place
+
+C10 seat in 8 place
+
+C11 seat in 5 place
+
+B2 is free
+
+C7 -> B2
+
+C12 seat in 7 place
+
+B1 is free
+
+C8 -> B1
+
+C13 seat in 6 place
+
+B1 is free
+
+C9 -> B1
+
+C14 seat in 9 place
+
+B2 is free
+
+C10 -> B2
+
+C15 seat in 8 place
+
+C16 seat in 4 place
+
+C17 seat in 3 place
+
+B1 is free
+
+C11 -> B1
+
+C18 seat in 5 place
+
+C19 seat in 2 place
+
+B2 is free
+
+C12 -> B2
+
+C20 seat in 7 place
+
+B1 is free
+
+B2 is free
+
