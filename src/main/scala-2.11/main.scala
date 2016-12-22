@@ -34,8 +34,8 @@ object main {
 
     //println(stringOf(parallelAdding(Array(9,	7,	5,	3,	1),Array(3,	2,	1,	8,	6))))
     measur()
-
-    //println(oneThread(t))
+    //println(oneThread("(())("))
+    //println(parallelMult("(()))()"))
     //println(stringOf(Adding(Array(9,	7,	5,	3,	1),Array(3,	2,	1,	8,	6))))
 
 
@@ -60,11 +60,11 @@ object main {
   def measur() : Unit = {
     Trees.threshold = 1
     var file = "measur.txt"
-    var t = Array((0, 7), (2, 9), (12, 11), (8, 4))
+    var t = "(())()"
     val time2 = standardConfig measure {
       oneThread(t)
     }
-    writeToFile(file, s"Measuring of ex8 (example = " + stringOf(t) + s"):\n\nFor 1 thread: $time2 \n\n")
+    writeToFile(file, s"Measuring of ex9 [example = " + stringOf(t) + s"]:\n\nFor 1 thread: $time2 \n\n")
     do {
       Trees.threshold = Trees.threshold * 2
       val time1 = standardConfig measure {
@@ -75,27 +75,31 @@ object main {
   }
 
 
-  def oneThread(a: Array[(Int, Int)]): Int = {
+  def oneThread(a: String): Boolean = {
     var N = a.length
-    var x = a(0)._2
-    for (i <- 1 until N) x = a(i)._1 * x + a(i)._2
-    x
+    var x = 0
+    var f = true
+    for (i <- 0 until N) {
+      if (x < 0)
+        f = false
+      if (a(i) == '(')
+        x += 1
+      else
+        x -= 1
+    }
+    x == 0 && f
   }
-  def parallelMult(a: Array[(Int, Int)]): Int = {
+  def parallelMult(a: String): Boolean = {
     val N = a.length
     var t = new Array[(Int, Int)](N)
 
 
+    Trees.scanAPar(a.map({case '(' => (1, 0) ;case ')' => (0, 1)}).toArray, (0, 0), brackBalance, t)
 
-    //need to parallelize -- hard -- done
-    Trees.scanAPar(a, (0, 0), pairMult, t)
-    /*prefix_scan(0) = c(0)
-    for (i <- 1 until N)
-      prefix_scan(i) = f(prefix_scan(i - 1), c(i))*/
-
-    t(N - 1)._2
+    t(N - 1) == (0, 0)
   }
 
+  def brackBalance(p: (Int, Int), q: (Int, Int)): (Int, Int) = (p._1 + q._1 - math.min(p._1, q._2), p._2 + q._2 - math.min(p._1, q._2))
   def pairMult(a: (Int, Int), a1: (Int, Int)) : (Int, Int) = (a1._1 * a._1, a1._1 * a._2 + a1._2)
   def f(c1 : Char, c2 : Char) : Char = if (c2 == 'M') c1 else c2
   def bool2int(f : Boolean) : Int = if (f) 1 else 0

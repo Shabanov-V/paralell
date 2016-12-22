@@ -1,20 +1,20 @@
-Measuring of ex8 (example = Array((0,7), (2,9), (12,11), (8,4))):
+Measuring of ex9 [example = (())()]:
 
-For 1 thread: 0.017019399999999997 ms 
+For 1 thread: 0.017532799999999998 ms 
 
 For 2 threads: 
-Parallel: 0.1904676 ms
+Parallel: 0.368448 ms
 
 
 For 4 threads: 
-Parallel: 0.08278959999999999 ms
+Parallel: 0.15617140000000002 ms
 
 
 For 8 threads: 
-Parallel: 0.024033000000000002 ms
+Parallel: 0.05456599999999999 ms
 
 
 For 16 threads: 
-Parallel: 0.0118026 ms
+Parallel: 0.0730394 ms
 
 
