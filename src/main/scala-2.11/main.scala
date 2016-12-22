@@ -34,7 +34,8 @@ object main {
 
     //println(stringOf(parallelAdding(Array(9,	7,	5,	3,	1),Array(3,	2,	1,	8,	6))))
     measur()
-    //println(oneThread("(())("))
+    //println(oneThread(Array((45,40), (30, 50), (105, 40), (90, 20))))
+    //println(parallelMult(Array((45,40), (30, 50), (105, 40), (90, 20))))
     //println(parallelMult("(()))()"))
     //println(stringOf(Adding(Array(9,	7,	5,	3,	1),Array(3,	2,	1,	8,	6))))
 
@@ -56,15 +57,14 @@ object main {
       }
     }
 
-
-  def measur() : Unit = {
+ def measur() : Unit = {
     Trees.threshold = 1
     var file = "measur.txt"
-    var t = "(())()"
+    var t : Array[(Double, Double)] = Array((45,40), (30, 50), (105, 40), (90, 20))
     val time2 = standardConfig measure {
       oneThread(t)
     }
-    writeToFile(file, s"Measuring of ex9 [example = " + stringOf(t) + s"]:\n\nFor 1 thread: $time2 \n\n")
+    writeToFile(file, s"Measuring of ex10 [example = " + stringOf(t) + s"]:\n\nFor 1 thread: $time2 \n\n")
     do {
       Trees.threshold = Trees.threshold * 2
       val time1 = standardConfig measure {
@@ -75,30 +75,41 @@ object main {
   }
 
 
-  def oneThread(a: String): Boolean = {
+  def oneThread(a: Array[(Double, Double)]): (Double, Double) = {
     var N = a.length
-    var x = 0
-    var f = true
+    var (x, y, angle) = (0.0, 0.0, 0.0)
     for (i <- 0 until N) {
-      if (x < 0)
-        f = false
-      if (a(i) == '(')
-        x += 1
-      else
-        x -= 1
+      angle = (angle + a(i)._1) % 360
+      x = x + a(i)._2 * cos(angle)
+      y = y + a(i)._2 * sin(angle)
     }
-    x == 0 && f
+    (math.round(x * 1000) / 1000.0, math.round(y * 1000) / 1000.0)
   }
-  def parallelMult(a: String): Boolean = {
+  def parallelMult(a: Array[(Double, Double)]): (Double, Double) = {
     val N = a.length
-    var t = new Array[(Int, Int)](N)
+    var t = new Array[(Double, Double, Double)](N)
 
+    var tmp = a.map({case (x, y) => (y, x, x)})
 
-    Trees.scanAPar(a.map({case '(' => (1, 0) ;case ')' => (0, 1)}).toArray, (0, 0), brackBalance, t)
+    Trees.scanAPar(tmp, (0.0, 0.0, 0.0), move, t)
 
-    t(N - 1) == (0, 0)
+    var (x, y, z) = t(N - 1)
+    (math.round(x * cos(y) * 1000) / 1000.0, math.round(x * sin(y) * 1000) / 1000.0)
+  }
+  def move(t: (Double, Double, Double), t1: (Double, Double, Double)): (Double, Double, Double) = {
+    val (a, alpha, falpha) = t
+    val (b, beta,  fbeta)  = t1
+    val D = math.sqrt(a * a + b * b + 2 * a * b * cos(beta + falpha - alpha))
+    if (D == 0) {
+      (D, alpha, (falpha + fbeta) % 360)
+    } else {
+      (D, (alpha + asin(b * sin(beta + falpha - alpha) / D)) % 360, (falpha + fbeta) % 360)
+    }
   }
 
+  def asin(x: Double): Double = 180 * Math.asin(x) / math.Pi
+  def cos(x: Double):  Double = Math.cos(x * math.Pi / 180)
+  def sin(x: Double):  Double = Math.sin(x * math.Pi / 180)
   def brackBalance(p: (Int, Int), q: (Int, Int)): (Int, Int) = (p._1 + q._1 - math.min(p._1, q._2), p._2 + q._2 - math.min(p._1, q._2))
   def pairMult(a: (Int, Int), a1: (Int, Int)) : (Int, Int) = (a1._1 * a._1, a1._1 * a._2 + a1._2)
   def f(c1 : Char, c2 : Char) : Char = if (c2 == 'M') c1 else c2
