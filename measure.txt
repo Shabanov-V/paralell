@@ -1,0 +1,2 @@
+Time of usual kMean: 299.4755088 ms
+Time of parallel kMean: 140.676352 ms

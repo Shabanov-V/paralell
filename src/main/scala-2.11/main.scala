@@ -5,9 +5,6 @@
 
 import java.io.{FileWriter, PrintWriter}
 
-import akka.actor._
-import akka.pattern.ask
-import akka.util.Timeout
 import org.scalameter.{Key, Warmer, config}
 
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -16,8 +13,116 @@ import scala.language.postfixOps
 import scala.runtime.ScalaRunTime._
 import scala.io.Source
 import scala.reflect.io.File
+import scala.collection.GenSeq
+import scala.reflect.macros.blackbox
+
+class Point(val x: Double, val y: Double) {
+  def distance(q: Point): Double = (x - q.x) * (x - q.x) + (q.y - y) * (q.y - y)
+  def printpoint(): Unit = {
+    print(s"(${main.round2(x)}, ${main.round2(y)}) ")
+  }
+  def equal(point: Point): Boolean = {
+    (point.x == x) && (point.y == y)
+  }
+}
 
 
+object kMeans {
+
+  val max = 10000.0
+  val min = -10000.0
+
+  // генерирует множество точек
+  def generatePoints(k: Int, num: Int): Seq[Point] = {
+    val rand = scala.util.Random
+    var points: Seq[Point] = Seq()
+    for (i <- 0 until num) {
+      val x = min + (max - min) * rand.nextDouble
+      val y = min + (max - min) * rand.nextDouble
+      points = points :+ new Point(x, y)
+    }
+    points
+  }
+
+
+  //выбирает k точек случайным образом для использования в качестве начальных центров кластеров
+  def initializeMeans(k: Int, points: Seq[Point]): Seq[Point] = {
+    val rand = scala.util.Random
+    var centres: Seq[Point] = Seq()
+    var set: Set[Int] = Set()
+    for (i <- 0 until k) {
+      var tmp = rand.nextInt(points.length)
+      do {
+        tmp = rand.nextInt(points.length)
+      }while (set(tmp))
+      set = set + tmp
+      centres = centres :+ points.apply(tmp)
+    }
+    centres
+  }
+
+  //для точки находит ближайший из центров кластеров
+  def findClosest(p: Point, means: GenSeq[Point]): Point = {
+    var res = means(0)
+    var m_dist = means(0).distance(p)
+    for (i <- 0 until means.length) {
+      val dist = means(i).distance(p)
+      if (dist < m_dist) {
+        m_dist = dist
+        res = means(i)
+      }
+    }
+    res
+  }
+
+  def findIndex(p: Point, means: GenSeq[Point]) : Int = {
+    var tmp = -1
+    for (i <- 0 to means.length) {
+      if (means.apply(i) == p)
+        tmp = i
+    }
+    tmp
+  }
+
+  //возвращает последовательность из элементов (центр кластера, <точки, для которых этот центр ближайший>)
+  def classify(points: GenSeq[Point], means: GenSeq[Point]): GenSeq[(Point, GenSeq[Point])] = {
+    val newMeans = points.map((p: Point) => (p, findClosest(p, means))).groupBy(_._2).toSeq
+    val emptyMeans = means.diff(newMeans.map(_._1)).map((_, GenSeq()))
+    newMeans.map({ case (q: Point, seq: GenSeq[(Point, Point)]) => (q, seq.map(_._1)) }) ++ emptyMeans
+  }
+
+  //вычисляет новый центр кластера; если после classify в кластере нет ни одной, возвращается старое значение
+  def findAverage(oldMean: Point, points: GenSeq[Point]): Point = {
+    if (points.length == 0)
+      oldMean
+    else {
+      val sumx = points.aggregate(0.0)((z, p) => z + p.x, _ + _)
+      val sumy = points.aggregate(0.0)((z, p) => z + p.y, _ + _)
+      new Point(sumx / points.length, sumy / points.length)
+    }
+  }
+
+  //вычисляет новые центры кластеров
+  def update(classified: GenSeq[(Point, GenSeq[Point])]): GenSeq[Point] = {
+    classified.map({ case (p, seq) => findAverage(p, seq) })
+  }
+
+
+  //определяет, сошлись ли итерации (абсолютное изменение положения для каждого меньше eta -> true)
+  def converged(eta: Double)(oldMeans: GenSeq[Point], newMeans: GenSeq[Point]): Boolean = {
+    val means = oldMeans.zip(newMeans)
+    means.forall({ case (a, b) => a.distance(b) < eta })
+  }
+  //вычисляет центры кластеров алгоритмом k-means.
+  @annotation.tailrec
+  final def kMeans(points: GenSeq[Point], means: GenSeq[Point], eta: Double): GenSeq[Point] = {
+    val newMeans = update(classify(points, means))
+    if (converged(eta)(means, newMeans))
+      means
+    else
+      kMeans(points, newMeans, eta)
+  }
+}
 
 
 object main {
@@ -29,274 +134,27 @@ object main {
     Key.verbose -> false
   ) withWarmer(new Warmer.Default)
 
-  val r = scala.util.Random
-  val file = "log.txt"
-  val MaxTime = 1e9.toInt
-  val K       = 10
-  val M       = 20
-  val N       = 2
-  val FreePlace = new Client(MaxTime)
-  var close = false
-
-  var sofa = new Array[Client](K)
-  var clerk   = new Clerk
-
-  class Client(private var time: Int, private var place: Int = -1){
-    def getTime() = time
-    def take_place(): Int =
-      this.synchronized {
-          clerk.synchronized {
-            var i = clerk.find_place()
-            if (i == -1) {
-              appendToFile(file, s"C$time leave\n")
-              -1
-            } else {
-              appendToFile(file, s"C$time seat in $i place\n")
-              sofa(i) = this
-              place = i
-              i
-            }
-          }
-      }
-
-    def free(): Unit = {
-      this.synchronized {
-        sofa(place) = FreePlace
-      }
-    }
-  }
-
-
-  class Barber(private val num: Int) {
-    def getNum() = num
-    def cut (target: Client) =
-      this.synchronized {
-        target.synchronized {
-          Thread.sleep(r.nextInt(200) + 100)
-          if (deb)
-            print(num + ": ")
-          printSofa()
-          val tmp = this.getNum()
-          appendToFile(file, s"B$tmp is free\n")
-          this.find_client()
-        }
-      }
-    def find_client(): Unit =
-      this.synchronized {
-        if (!close) {
-          var target = clerk.find_next_clien()
-          if (target.getTime() != MaxTime) {
-            target.synchronized {
-              val t = new Thread {
-                override def run {
-                  target.free()
-                }
-              }
-              val tmp = this.getNum()
-              appendToFile(file, s"C${target.getTime()} -> B$tmp\n")
-              t.run
-              this.cut(target)
-              t.join()
-            }
-          }
-          else {
-            appendToFile(file, s"B$num can't find client\n")
-            Thread.sleep(r.nextInt(10))
-            this.find_client()
-          }
-        }
-      }
-  }
-
-  class Clerk() {
-    def find_next_clien(): Client =
-      this.synchronized {
-        var t = new Client(MaxTime)
-        if (!close) {
-          for (i <- 0 until K) {
-            if (sofa(i).getTime() < t.getTime()) {
-              t = sofa(i)
-            }
-          }
-        }
-        t
-      }
-    def find_place(): Int =
-      this.synchronized {
-        var t = -1
-        if (!close) {
-          for (i <- 0 until K)
-            if (sofa(i).getTime() == MaxTime) {
-              t = i
-            }
-          }
-        t
-      }
-  }
-
-  def visit(client: Client) = {
-    val t = new Thread {
-      override def run() {
-        client.take_place()
-      }
-    }
-    t.start()
-    Thread.sleep(r.nextInt(100))
-    t
-  }
-
-  def pickUp(barber: Barber) = this.synchronized{
-    val t = new Thread {
-      override def run() {
-        barber.find_client()
-      }
-    }
-    t.start()
-    t
-  }
-
-  val deb = false
-
-  def printSofa(): Unit = {
-    if (deb) {
-      var j = 0
-      for (i <- 0 until K)
-        if (sofa(i).getTime() == MaxTime) {
-          j = j + 1
-          print("0 ")
-        }
-        else {
-          print(sofa(i).getTime() + " ")
-        }
-      print(s" -- $j")
-      println()
-    }
-  }
-
   def main(args: Array[String]): Unit ={
-
-    // (a, b) <+> (a',b') = (a' * a, a' * b + b') -- is asociative
-    writeToFile(file, "\n\n")
-    sofa = Array.fill(K)(FreePlace)
-    var arr: Array[Client] = Array()
-    for (i <- 0 to M + 1)
-      arr = arr :+ new Client(i)
-
-    var arr1: Array[Barber] = Array()
-    for (i <- 0 to N + 1)
-      arr1 = arr1 :+ new Barber(i)
-
-    var threads1 =
-      for (i <- 0 until 0)
-        yield pickUp(arr1(i + 1))
-
-    val thread = new Thread {
-      override def run {
-        threads1 =
-          for (i <- 0 until N)
-            yield pickUp(arr1(i + 1))
-      }
+    val tmp = kMeans.generatePoints(0, 100)
+    val c = kMeans.initializeMeans(7, tmp)
+    val c_par = c.par
+    val time1 = standardConfig measure {
+      kMeans.kMeans(tmp, c, 1)
     }
-
-    thread.run
-
-    val threads =
-    for (i <- 0 until M)
-      yield visit(arr(i + 1))
-
-    print("   ")
-    printSofa()
-
-
-
-    threads.foreach(t => t.join())
-    close = true
-    if (deb)
-      println("Close!!!")
-    threads1.foreach(t => t.join())
-    checkLog()
-
-
+    //println("!!!")
+    val time2 = standardConfig measure {
+      kMeans.kMeans(tmp, c_par, 1)
+    }
+    writeToFile("measure.txt", s"Time of usual kMean: $time1\nTime of parallel kMean: $time2")
+    //t.foreach(t => t.printpoint())
+    //println()
+    //kMeans.initializeMeans(10, t).foreach(t => t.printpoint())
+    //println(stringOf(kMeans.initializeMeans(3, kMeans.generatePoints(0, 10))))
   }
 
-  def checkLog(): Unit = {
-    val filename = "log.txt"
-    var t = 0
-    var arr = new Array[Boolean](N)
-    var places = new Array[Int](M)
-    for (line <- Source.fromFile(filename).getLines()) {
-      if (line != "") {
-        t = t + 1
-        if (t > 10) {
-         // return
-        }
-
-        var tp = line(0)
-        var i = 0
-        do
-          i = i + 1
-        while (line(i).isDigit)
-        var s = ""
-        for (j <- 1 until i)
-          s = s :+ line(j)
-
-        //println(s"$tp $s ${line(s.length + 2)}")
-        var p = line(s.length + 2)
-        if (tp == 'B') {
-          if (p == 'c') {
-            if (arr(s.toInt - 1)) {
-              err
-            }
-          }
-          if (p == 'i') {
-            if (arr(s.toInt - 1)) {
-              arr(s.toInt - 1) = false
-            } else
-              err
-          }
-        }
-        if (tp == 'C') {
-          if (p == '-') {
-            var tp2 = line(s.length + 5)
-            var s2 = ""
-            for (j <- s.length + 6 until line.length)
-              s2 = s2 :+ line(j)
-            //println(s"$tp$s -> $tp2$s2")
-            arr(s2.toInt - 1) = true
-            var tmp = -1
-            for (j <- 0 until M) {
-              if (places(j) == s.toInt) {
-                if (tmp == -1)
-                  tmp = j
-                else
-                  err
-              }
-            }
-            if (tmp == -1)
-              err
-            else
-              places(tmp) = 0
-          }
-          if (p == 's') {
-            var s2 = ""
-            var j = s.length + 10
-            do {
-              s2 = s2 :+ line(j)
-              j = j + 1
-            } while (line(j).isDigit)
-            //println(s"$tp$s to $s2")
-            if (places(s2.toInt - 1) != 0)
-              err
-            else
-              places(s2.toInt - 1) = s.toInt
-          }
-        }
-
-      }
-    }
-  }
 
   def err = writeToFile("error.txt", "ERROR")
+
   def using[A <: {def close(): Unit}, B](param: A)(f: A => B): B =
     try { f(param) } finally { param.close() }
 
@@ -312,6 +170,7 @@ object main {
       }
     }
 
+  def round2(x : Double) = math.round(x * 100) / 100.0
   def bool2int(f : Boolean) : Int = if (f) 1 else 0
   def roundUp(d: Double) = math.ceil(d).toInt
   def roundDown(d: Double) = math.floor(d).toInt
