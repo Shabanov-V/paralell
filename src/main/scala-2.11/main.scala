@@ -145,7 +145,7 @@ object main {
     val time2 = standardConfig measure {
       kMeans.kMeans(tmp, c_par, 1)
     }
-    writeToFile("measure.txt", s"Time of usual kMean: $time1\nTime of parallel kMean: $time2")
+    writeToFile("measure.txt", s"Time of usual kMean: $time1\nTime of parallel kMean: $time2\nAcceleration = ${time1.toString().dropRight(3).toDouble/time2.toString().dropRight(3).toDouble}")
     //t.foreach(t => t.printpoint())
     //println()
     //kMeans.initializeMeans(10, t).foreach(t => t.printpoint())
